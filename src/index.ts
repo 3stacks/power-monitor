@@ -537,8 +537,8 @@ function startWebServer(): void {
     });
   });
 
-  app.listen(WEB_PORT, () => {
-    console.log(`Web dashboard: http://localhost:${WEB_PORT}`);
+  app.listen(WEB_PORT, "0.0.0.0", () => {
+    console.log(`Web dashboard: http://0.0.0.0:${WEB_PORT}`);
   });
 }
 
