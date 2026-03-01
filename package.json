@@ -1,0 +1,25 @@
+{
+  "name": "power-monitor",
+  "version": "1.0.0",
+  "description": "Track power outages via network connectivity",
+  "main": "build/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node build/index.js",
+    "history": "node build/index.js --history",
+    "dev": "tsc && node build/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "better-sqlite3": "^12.6.2",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.3.3",
+    "typescript": "^5.9.3"
+  }
+}
