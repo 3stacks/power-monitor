@@ -7,9 +7,10 @@ services:
     restart: unless-stopped
     volumes:
       - ./data:/data
+    ports:
+      - "3333:3333"
     environment:
       - PING_TARGET=8.8.8.8
       - PING_INTERVAL_MS=60000
       - DB_PATH=/data/power-monitor.db
       - WEB_PORT=3333
-    network_mode: host
