@@ -1,0 +1,15 @@
+services:
+  power-monitor:
+    image: registry.home.lukeboyle.com/power-monitor:${POWER_MONITOR_VERSION:-latest}
+    container_name: power-monitor
+    restart: unless-stopped
+    volumes:
+      - ${DATA_PATH:-./data}:/data
+    ports:
+      - "${WEB_PORT:-3333}:3333"
+    environment:
+      - PING_TARGET=${PING_TARGET:-8.8.8.8}
+      - PING_INTERVAL_MS=${PING_INTERVAL_MS:-60000}
+      - MIN_OUTAGE_DURATION_MS=${MIN_OUTAGE_DURATION_MS:-300000}
+      - DB_PATH=/data/power-monitor.db
+      - WEB_PORT=3333
