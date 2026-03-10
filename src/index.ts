@@ -12,6 +12,8 @@ const PING_INTERVAL_MS = parseInt(process.env.PING_INTERVAL_MS || "60000", 10);
 const PING_TIMEOUT_S = parseInt(process.env.PING_TIMEOUT_S || "5", 10);
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, "..", "power-monitor.db");
 const WEB_PORT = parseInt(process.env.WEB_PORT || "3333", 10);
+// Minimum outage duration before recording (filters brief network blips)
+const MIN_OUTAGE_DURATION_MS = parseInt(process.env.MIN_OUTAGE_DURATION_MS || String(5 * 60 * 1000), 10);
 
 // Initialize database
 const db = new Database(DB_PATH);
@@ -35,6 +37,7 @@ db.exec(`
 // State
 let currentOutageId: number | null = null;
 let lastStatus: boolean | null = null;
+let pendingOutageStart: Date | null = null; // When consecutive failures began
 
 // Check for unclosed outages on startup (server crashed during outage)
 function checkUnclosedOutages(): void {
@@ -86,9 +89,9 @@ function recordPing(success: boolean): void {
   ).run();
 }
 
-// Start an outage
-function startOutage(): void {
-  const startedAt = new Date().toISOString();
+// Start an outage (with the actual start time from when failures began)
+function startOutage(startTime: Date): void {
+  const startedAt = startTime.toISOString();
   const result = db
     .prepare("INSERT INTO outages (started_at) VALUES (?)")
     .run(startedAt);
@@ -127,6 +130,7 @@ function endOutage(): void {
   }
 
   currentOutageId = null;
+  pendingOutageStart = null;
 }
 
 // Main monitoring loop
@@ -134,20 +138,40 @@ async function monitor(): Promise<void> {
   const success = await ping();
   recordPing(success);
 
-  const timestamp = new Date().toISOString();
+  const now = new Date();
+  const timestamp = now.toISOString();
 
   if (success) {
-    if (lastStatus === false) {
-      // Was down, now up - end outage
+    if (pendingOutageStart) {
+      // Was in pending outage state, but recovered before threshold
+      const pendingDuration = now.getTime() - pendingOutageStart.getTime();
+      console.log(`[${timestamp}] ✓ Network recovered (was down ${Math.round(pendingDuration / 1000)}s - below threshold, not recorded)`);
+      pendingOutageStart = null;
+    } else if (lastStatus === false && currentOutageId) {
+      // Was in confirmed outage, now up - end it
       endOutage();
+      console.log(`[${timestamp}] ✓ Network up`);
+    } else {
+      console.log(`[${timestamp}] ✓ Network up`);
     }
-    console.log(`[${timestamp}] ✓ Network up`);
   } else {
-    if (lastStatus !== false) {
-      // Was up (or first check), now down - start outage
-      startOutage();
+    if (lastStatus !== false && !pendingOutageStart) {
+      // First failure - start tracking potential outage
+      pendingOutageStart = now;
+      console.log(`[${timestamp}] ✗ Network down (monitoring for ${MIN_OUTAGE_DURATION_MS / 1000}s before recording)`);
+    } else if (pendingOutageStart && !currentOutageId) {
+      // Continuing failures - check if threshold exceeded
+      const pendingDuration = now.getTime() - pendingOutageStart.getTime();
+      if (pendingDuration >= MIN_OUTAGE_DURATION_MS) {
+        // Threshold exceeded - record the outage with original start time
+        startOutage(pendingOutageStart);
+        console.log(`[${timestamp}] ✗ Network down (outage confirmed after ${Math.round(pendingDuration / 1000)}s)`);
+      } else {
+        console.log(`[${timestamp}] ✗ Network down (${Math.round(pendingDuration / 1000)}s)`);
+      }
+    } else {
+      console.log(`[${timestamp}] ✗ Network down`);
     }
-    console.log(`[${timestamp}] ✗ Network down`);
   }
 
   lastStatus = success;
@@ -554,6 +578,7 @@ async function main(): Promise<void> {
   console.log("=== Power Monitor Starting ===");
   console.log(`Ping target: ${PING_TARGET}`);
   console.log(`Interval: ${PING_INTERVAL_MS / 1000}s`);
+  console.log(`Min outage duration: ${MIN_OUTAGE_DURATION_MS / 1000}s`);
   console.log(`Database: ${DB_PATH}`);
   console.log("");
 
