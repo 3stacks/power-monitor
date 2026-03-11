@@ -123,6 +123,14 @@ The dashboard warns about extended outages:
 
 A typical freezer stays safe for 24-48 hours if kept closed, but 4 hours is a reasonable "check on it" threshold.
 
+## Deployment (Homeserver)
+
+This project uses the unified homeserver deployment pattern. See [deploy/README.md](deploy/README.md) for details.
+
+**Quick deploy:**
+1. Push to `main` branch → Gitea builds and pushes to `registry.home.lukeboyle.com/power-monitor`
+2. On homeserver: `cd ~/power-monitor && docker compose pull && docker compose up -d`
+
 ## License
 
 ISC
